@@ -9,8 +9,10 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
+import { graphql, compose } from 'react-apollo';
 import withStyles from 'isomorphic-style-loader/lib/withStyles';
 import s from './Home.css';
+import newsQuery from './news.graphql';
 
 class Home extends React.Component {
   static propTypes = {
@@ -24,26 +26,31 @@ class Home extends React.Component {
   };
 
   render() {
+    const { data: { loading, news } } = this.props;
     return (
       <div className={s.root}>
         <div className={s.container}>
           <h1>React.js News</h1>
-          {this.props.news.map(item => (
-            <article key={item.link} className={s.newsItem}>
-              <h1 className={s.newsTitle}>
-                <a href={item.link}>{item.title}</a>
-              </h1>
-              <div
-                className={s.newsDesc}
-                // eslint-disable-next-line react/no-danger
-                dangerouslySetInnerHTML={{ __html: item.content }}
-              />
-            </article>
-          ))}
+          {loading ? (
+            <span className="span-spinner" />
+          ) : (
+            news.map(item => (
+              <article key={item.link} className={s.newsItem}>
+                <h1 className={s.newsTitle}>
+                  <a href={item.link}>{item.title}</a>
+                </h1>
+                <div
+                  className={s.newsDesc}
+                  // eslint-disable-next-line react/no-danger
+                  dangerouslySetInnerHTML={{ __html: item.content }}
+                />
+              </article>
+            ))
+          )}
         </div>
       </div>
     );
   }
 }
 
-export default withStyles(s)(Home);
+export default compose(withStyles(s), graphql(newsQuery))(Home);

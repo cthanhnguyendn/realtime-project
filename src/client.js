@@ -15,9 +15,20 @@ import queryString from 'query-string';
 import { createPath } from 'history/PathUtils';
 import App from './components/App';
 import createFetch from './createFetch';
-import history from './history';
+import configureStore from './store/configureStore';
 import { updateMeta } from './DOMUtils';
+import history from './history';
+import createApolloClient from './createApolloClient';
 import router from './router';
+
+const apolloClient = createApolloClient();
+
+/* eslint-disable global-require */
+
+// Universal HTTP client
+const fetch = createFetch(self.fetch, {
+  baseUrl: window.App.apiUrl,
+});
 
 // Global (context) variables that can be easily accessed from any React component
 // https://facebook.github.io/react/docs/context.html
@@ -31,15 +42,14 @@ const context = {
       removeCss.forEach(f => f());
     };
   },
-  // Universal HTTP client
-  fetch: createFetch(fetch, {
-    baseUrl: window.App.apiUrl,
-  }),
+  // For react-apollo
+  client: apolloClient,
+  // Initialize a new Redux store
+  // http://redux.js.org/docs/basics/UsageWithReact.html
+  store: configureStore(window.App.state, { apolloClient, fetch, history }),
+  fetch,
+  storeSubscription: null,
 };
-
-const container = document.getElementById('app');
-let currentLocation = history.location;
-let appInstance;
 
 // Switch off the native scroll restoration behavior and handle it manually
 // https://developers.google.com/web/updates/2015/09/history-api-scroll-restoration
@@ -47,6 +57,53 @@ const scrollPositionsHistory = {};
 if (window.history && 'scrollRestoration' in window.history) {
   window.history.scrollRestoration = 'manual';
 }
+
+let onRenderComplete = function initialRenderComplete() {
+  const elem = document.getElementById('css');
+  if (elem) elem.parentNode.removeChild(elem);
+  onRenderComplete = function renderComplete(route, location) {
+    document.title = route.title;
+
+    updateMeta('description', route.description);
+    // Update necessary tags in <head> at runtime here, ie:
+    // updateMeta('keywords', route.keywords);
+    // updateCustomMeta('og:url', route.canonicalUrl);
+    // updateCustomMeta('og:image', route.imageUrl);
+    // updateLink('canonical', route.canonicalUrl);
+    // etc.
+
+    let scrollX = 0;
+    let scrollY = 0;
+    const pos = scrollPositionsHistory[location.key];
+    if (pos) {
+      scrollX = pos.scrollX;
+      scrollY = pos.scrollY;
+    } else {
+      const targetHash = location.hash.substr(1);
+      if (targetHash) {
+        const target = document.getElementById(targetHash);
+        if (target) {
+          scrollY = window.pageYOffset + target.getBoundingClientRect().top;
+        }
+      }
+    }
+
+    // Restore the scroll position if it was saved into the state
+    // or scroll to the given #hash anchor
+    // or scroll to top of the page
+    window.scrollTo(scrollX, scrollY);
+
+    // Google Analytics tracking. Don't send 'pageview' event after
+    // the initial rendering, as it was already sent
+    if (window.ga) {
+      window.ga('send', 'pageview', createPath(location));
+    }
+  };
+};
+
+const container = document.getElementById('app');
+let appInstance;
+let currentLocation = history.location;
 
 // Re-render the app when window.location changes
 async function onLocationChange(location, action) {
@@ -61,7 +118,6 @@ async function onLocationChange(location, action) {
   }
   currentLocation = location;
 
-  const isInitialRender = !action;
   try {
     // Traverses the list of routes in the order they are defined until
     // it finds the first route that matches provided URL path string
@@ -82,54 +138,10 @@ async function onLocationChange(location, action) {
       return;
     }
 
-    const renderReactApp = isInitialRender ? ReactDOM.hydrate : ReactDOM.render;
-    appInstance = renderReactApp(
+    appInstance = ReactDOM.render(
       <App context={context}>{route.component}</App>,
       container,
-      () => {
-        if (isInitialRender) {
-          const elem = document.getElementById('css');
-          if (elem) elem.parentNode.removeChild(elem);
-          return;
-        }
-
-        document.title = route.title;
-
-        updateMeta('description', route.description);
-        // Update necessary tags in <head> at runtime here, ie:
-        // updateMeta('keywords', route.keywords);
-        // updateCustomMeta('og:url', route.canonicalUrl);
-        // updateCustomMeta('og:image', route.imageUrl);
-        // updateLink('canonical', route.canonicalUrl);
-        // etc.
-
-        let scrollX = 0;
-        let scrollY = 0;
-        const pos = scrollPositionsHistory[location.key];
-        if (pos) {
-          scrollX = pos.scrollX;
-          scrollY = pos.scrollY;
-        } else {
-          const targetHash = location.hash.substr(1);
-          if (targetHash) {
-            const target = document.getElementById(targetHash);
-            if (target) {
-              scrollY = window.pageYOffset + target.getBoundingClientRect().top;
-            }
-          }
-        }
-
-        // Restore the scroll position if it was saved into the state
-        // or scroll to the given #hash anchor
-        // or scroll to top of the page
-        window.scrollTo(scrollX, scrollY);
-
-        // Google Analytics tracking. Don't send 'pageview' event after
-        // the initial rendering, as it was already sent
-        if (window.ga) {
-          window.ga('send', 'pageview', createPath(location));
-        }
-      },
+      () => onRenderComplete(route, location),
     );
   } catch (error) {
     if (__DEV__) {
@@ -139,7 +151,7 @@ async function onLocationChange(location, action) {
     console.error(error);
 
     // Do a full page reload if error occurs during client-side navigation
-    if (!isInitialRender && currentLocation.key === location.key) {
+    if (action && currentLocation.key === location.key) {
       window.location.reload();
     }
   }
@@ -153,7 +165,7 @@ onLocationChange(currentLocation);
 // Enable Hot Module Replacement (HMR)
 if (module.hot) {
   module.hot.accept('./router', () => {
-    if (appInstance && appInstance.updater.isMounted(appInstance)) {
+    if (appInstance) {
       // Force-update the whole tree, including components that refuse to update
       deepForceUpdate(appInstance);
     }

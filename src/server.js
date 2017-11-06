@@ -9,10 +9,11 @@
 
 import path from 'path';
 import express from 'express';
+import Promise from 'bluebird';
 import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 import expressGraphQL from 'express-graphql';
-import fetch from 'node-fetch';
+import nodeFetch from 'node-fetch';
 import React from 'react';
 import ReactDOM from 'react-dom/server';
 import PrettyError from 'pretty-error';
@@ -22,6 +23,7 @@ import Html from './components/Html';
 import { ErrorPageWithoutStyle } from './routes/error/ErrorPage';
 import errorPageStyle from './routes/error/ErrorPage.css';
 import createFetch from './createFetch';
+import configureStore from './store/configureStore';
 import passport from './security/passport';
 import {
   securityRouter,
@@ -33,6 +35,9 @@ import models from './data/models';
 import schema from './data/schema';
 import assets from './assets.json'; // eslint-disable-line import/no-unresolved
 import config from './config';
+import createApolloClient from './createApolloClient';
+import { setRuntimeVariable } from './actions/runtime';
+import { getDataFromTree } from 'react-apollo';
 
 const app = express();
 
@@ -112,6 +117,31 @@ app.get('*', async (req, res, next) => {
   try {
     const css = new Set();
 
+    const initialState = {
+      user: req.user || null,
+    };
+    const apolloClient = createApolloClient({
+      schema,
+      rootValue: { request: req },
+    });
+    const fetch = createFetch(nodeFetch, {
+      baseUrl: config.api.serverUrl,
+      cookie: req.headers.cookie,
+    });
+    const store = configureStore(initialState, {
+      cookie: req.headers.cookie,
+      apolloClient,
+      fetch,
+      // I should not use `history` on server.. but how I do redirection? follow universal-router
+      history: null,
+    });
+    store.dispatch(
+      setRuntimeVariable({
+        name: 'initialNow',
+        value: Date.now(),
+      }),
+    );
+
     // Global (context) variables that can be easily accessed from any React component
     // https://facebook.github.io/react/docs/context.html
     const context = {
@@ -122,10 +152,9 @@ app.get('*', async (req, res, next) => {
         styles.forEach(style => css.add(style._getCss()));
       },
       // Universal HTTP client
-      fetch: createFetch(fetch, {
-        baseUrl: config.api.serverUrl,
-        cookie: req.headers.cookie,
-      }),
+      fetch,
+      store,
+      client: apolloClient,
     };
 
     const route = await router.resolve({
@@ -140,9 +169,16 @@ app.get('*', async (req, res, next) => {
     }
 
     const data = { ...route };
-    data.children = ReactDOM.renderToString(
-      <App context={context}>{route.component}</App>,
+    const rootComponent = (
+      <App context={context} store={store}>
+        {route.component}
+      </App>
     );
+    await getDataFromTree(rootComponent);
+    // this is here because of Apollo redux APOLLO_QUERY_STOP action
+    await Promise.delay(0);
+
+    data.children = await ReactDOM.renderToString(rootComponent);
     data.styles = [{ id: 'css', cssText: [...css].join('') }];
     data.scripts = [assets.vendor.js];
     if (route.chunks) {
@@ -151,6 +187,7 @@ app.get('*', async (req, res, next) => {
     data.scripts.push(assets.client.js);
     data.app = {
       apiUrl: config.api.clientUrl,
+      state: context.store.getState(),
     };
 
     const html = ReactDOM.renderToStaticMarkup(<Html {...data} />);
