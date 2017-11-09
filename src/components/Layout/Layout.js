@@ -17,19 +17,41 @@ import s from './Layout.css';
 import Header from '../Header';
 import Feedback from '../Feedback';
 import Footer from '../Footer';
+import Sidebar from '../Sidebar';
 
 class Layout extends React.Component {
   static propTypes = {
     children: PropTypes.node.isRequired,
   };
 
+  state = {
+    layoutHeight: 600,
+  };
+
+  componentDidMount() {
+    this.setState({ layoutHeight: window.innerHeight });
+  }
   render() {
     return (
       <div>
-        <Header />
-        {this.props.children}
-        <Feedback />
-        <Footer />
+        <div
+          className={s.sideMenuContainer}
+          style={{ height: this.state.layoutHeight }}
+        >
+          <div className={s.sideMenu}>
+            <Sidebar />
+          </div>
+          <div className={s.bodyContent}>
+            <div className={s.layoutHead}>
+              <Header />
+            </div>
+            <div className={s.layoutBody}>{this.props.children}</div>
+            {/* <div className={s.layoutFooter}> */}
+            {/* <Feedback /> */}
+            {/* <Footer /> */}
+            {/* </div> */}
+          </div>
+        </div>
       </div>
     );
   }

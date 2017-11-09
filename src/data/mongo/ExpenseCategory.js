@@ -7,6 +7,7 @@ const expenseCategorySchema = new Schema({
   name: String,
   createdDate: Date,
   modifiedDate: Date,
+  source: { type: Schema.Types.ObjectId, ref: 'SourceVoucher' },
 });
 const ExpenseCategory = mongoose.model(
   'ExpenseCategory',

@@ -25,10 +25,13 @@ const createNewVoucher = ({
 
 const deleteVoucher = id =>
   Voucher.remove({ _id: new mongoose.Schema.ObjectId(id) });
+const findBySourceId = id =>
+  Voucher.find({ scource: new mongoose.Schema.ObjectId(id) });
 
 const VouncherService = {
   createNewVoucher,
   deleteVoucher,
+  findBySourceId,
 };
 
 export default VouncherService;

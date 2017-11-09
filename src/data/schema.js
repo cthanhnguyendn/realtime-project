@@ -14,11 +14,9 @@ import {
 
 import me from './queries/me';
 import news from './queries/news';
-import vouncer from './queries/voucher';
-import expenseCategory from './queries/expenseCategory';
-import receiveCategory from './queries/receiveCategory';
-
+import data from './queries/data';
 import voucherMutation from './mutations/voucher';
+import addVoucher from './subscriptions/voucherSubscription';
 
 const schema = new Schema({
   query: new ObjectType({
@@ -26,15 +24,19 @@ const schema = new Schema({
     fields: {
       me,
       news,
-      vouncer,
-      expenseCategory,
-      receiveCategory,
+      data,
     },
   }),
   mutation: new ObjectType({
     name: 'Mutation',
     fields: {
       voucherMutation,
+    },
+  }),
+  subscription: new ObjectType({
+    name: 'Subscription',
+    fields: {
+      addVoucher,
     },
   }),
 });

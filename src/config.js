@@ -15,6 +15,8 @@ if (process.env.BROWSER) {
   );
 }
 
+const websocketPort = 8181;
+const subcriptionPath = '/subscriptions';
 module.exports = {
   // Node.js app
   port: process.env.PORT || 3000,
@@ -65,4 +67,18 @@ module.exports = {
         'KTZ6cxoKnEakQCeSpZlaUCJWGAlTEBJj0y2EMkUBujA7zWSvaQ',
     },
   },
+
+  //
+  websocketPort,
+  subcriptionPath,
+  wsGqlURL:
+    process.env.NODE_ENV !== 'production'
+      ? `ws://localhost:${websocketPort}${subcriptionPath}`
+      : `ws://example.com${websocketPort}`,
+
+  // Redis
+  REDIS_TTL: process.env.REDIS_TTL || 260,
+  REDIS_HOST: process.env.REDIS_HOST || '127.0.0.1',
+  REDIS_PORT: process.env.REDIS_PORT || 6379,
+  COOKIE_NAME: '',
 };

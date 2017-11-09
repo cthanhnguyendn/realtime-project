@@ -10,8 +10,8 @@ const voucherSchema = new Schema({
   modifiedDate: Date,
   expenseCategory: { type: Schema.Types.ObjectId, ref: 'ExpenseCategory' },
   receiveCategory: { type: Schema.Types.ObjectId, ref: 'ReceiveCategory' },
+  source: { type: Schema.Types.ObjectId, ref: 'SourceVoucher' },
 });
-console.log('============register mongoose vouncer modal');
 const Voucher = mongoose.model('Vouncher', voucherSchema);
 
 export default Voucher;

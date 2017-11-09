@@ -1,11 +1,12 @@
 import { GraphQLList } from 'graphql';
 import VoucherType from '../types/VoucherType';
-import Voucher from '../mongo/Voucher';
+import { VoucherService } from '../service';
 
 const voucher = {
   type: new GraphQLList(VoucherType),
-  resolve() {
-    return Voucher.find({})
+  resolve(source) {
+    const sourceId = source.id;
+    return VoucherService.findBySourceId(sourceId)
       .populate('expenseCategory')
       .populate('receiveCategory');
   },

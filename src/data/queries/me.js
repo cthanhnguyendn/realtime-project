@@ -12,13 +12,12 @@ import Exception from '../exception';
 
 const me = {
   type: UserType,
-  resolve({}, args, request) {
-    const { user } = request;
+  resolve({}, args, { user }) {
     if (!user) throw Exception.permissionError();
     return (
-      request.user && {
-        id: request.user._id,
-        email: request.user.email,
+      user && {
+        id: user._id,
+        email: user.email,
       }
     );
   },

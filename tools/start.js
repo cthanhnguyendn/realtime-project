@@ -6,7 +6,7 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE.txt file in the root directory of this source tree.
  */
-
+import cp from 'child_process';
 import path from 'path';
 import express from 'express';
 import browserSync from 'browser-sync';
@@ -58,6 +58,7 @@ function createCompilationPromise(name, compiler, config) {
 }
 
 let server;
+// let socketProcess;
 
 /**
  * Launches a development web server with "live reload" functionality -
@@ -105,12 +106,29 @@ async function start() {
     new webpack.NamedModulesPlugin(),
   );
 
+  // Configure socket compilation
+  // const socketConfig = webpackConfig.find(config => config.name === 'socket');
+  // socketConfig.output.hotUpdateMainFilename = 'updates/[hash].hot-update.json';
+  // socketConfig.output.hotUpdateChunkFilename =
+  //   'updates/[id].[hash].hot-update.js';
+  // socketConfig.module.rules = socketConfig.module.rules.filter(
+  //   x => x.loader !== 'null-loader',
+  // );
+  // socketConfig.plugins.push(
+  //   // new webpack.HotModuleReplacementPlugin(),
+  //   // new webpack.NoEmitOnErrorsPlugin(),
+  //   new webpack.NamedModulesPlugin(),
+  // );
+
   // Configure compilation
   await run(clean);
   const multiCompiler = webpack(webpackConfig);
   const clientCompiler = multiCompiler.compilers.find(
     compiler => compiler.name === 'client',
   );
+  // const socketCompiler = multiCompiler.compilers.find(
+  //   compiler => compiler.name === 'socket',
+  // );
   const serverCompiler = multiCompiler.compilers.find(
     compiler => compiler.name === 'server',
   );
@@ -124,6 +142,11 @@ async function start() {
     serverCompiler,
     serverConfig,
   );
+  // const socketPromise = createCompilationPromise(
+  //   'socket',
+  //   socketCompiler,
+  //   socketConfig,
+  // );
 
   // https://github.com/webpack/webpack-dev-middleware
   server.use(
@@ -146,6 +169,20 @@ async function start() {
     // eslint-disable-next-line no-return-assign
     appPromise = new Promise(resolve => (appPromiseResolve = resolve));
   });
+
+  // let socketServerPromise;
+  // let socketServerPromiseResolve;
+  // let socketServerPromiseIsResolved = true;
+  // socketCompiler.plugin('compile', () => {
+  //   if (socketProcess || (socketProcess && !socketProcess.killed)) {
+  //     socketProcess.kill('SIGTERM');
+  //   }
+  //   if (!socketServerPromiseIsResolved) return;
+  //   socketServerPromiseIsResolved = false;
+  //   socketServerPromise = new Promise(
+  //     resolve => (socketServerPromiseResolve = resolve),
+  //   );
+  // });
 
   let app;
   server.use((req, res) => {
@@ -196,6 +233,15 @@ async function start() {
         }
       });
   }
+  // function checkForUpdateSocket() {
+  //   // only reload if it has already been spawned once and thus compiled
+  //   if (socketProcess) {
+  //     socketProcess = cp.spawn('node', ['./build/socket.js'], {
+  //       stdio: 'inherit',
+  //     });
+  //   }
+  //   return Promise.resolve();
+  // }
 
   serverCompiler.watch(watchOptions, (error, stats) => {
     if (app && !error && !stats.hasErrors()) {
@@ -206,12 +252,29 @@ async function start() {
     }
   });
 
+  // socketCompiler.watch(watchOptions, (error, stats) => {
+  //   if (!error && !stats.hasErrors()) {
+  //     checkForUpdateSocket().then(() => {
+  //       socketServerPromiseIsResolved = true;
+  //       socketServerPromiseResolve();
+  //     });
+  //   }
+  // });
+
   // Wait until both client-side and server-side bundles are ready
   await clientPromise;
   await serverPromise;
+  // await socketPromise;
 
   const timeStart = new Date();
   console.info(`[${format(timeStart)}] Launching server...`);
+
+  // spawn socket process
+  // if (!socketProcess || (socketProcess && socketProcess.killed)) {
+  //   socketProcess = cp.spawn('node', ['./build/socket.js'], {
+  //     stdio: 'inherit',
+  //   });
+  // }
 
   // Load compiled src/server.js as a middleware
   // eslint-disable-next-line global-require, import/no-unresolved

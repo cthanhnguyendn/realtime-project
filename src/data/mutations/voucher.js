@@ -6,6 +6,7 @@ import {
 } from 'graphql';
 import VoucherType from '../types/VoucherType';
 import { RCatService, ECatService, VoucherService } from '../service';
+import { publishAddVoucher } from '../subscriptions/voucherSubscription';
 
 export const addVoucher = {
   type: VoucherType,
@@ -28,6 +29,9 @@ export const addVoucher = {
           title,
           amount,
           expenseCategoryId: category._id,
+        }).then(voucher => {
+          publishAddVoucher({ voucher });
+          return voucher;
         }),
       );
     }
@@ -42,7 +46,10 @@ export const addVoucher = {
         }),
       );
     }
-    return VoucherService.createNewVoucher({ title, amount });
+    return VoucherService.createNewVoucher({ title, amount }).then(voucher => {
+      publishAddVoucher({ voucher });
+      return voucher;
+    });
   },
 };
 export const deleteVoucher = {

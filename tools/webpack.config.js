@@ -495,4 +495,114 @@ const serverConfig = {
   },
 };
 
-export default [clientConfig, serverConfig];
+const socketConfig = {
+  ...config,
+
+  name: 'socket',
+  target: 'node',
+
+  entry: {
+    socket: ['babel-polyfill', './src/socket.js'],
+  },
+
+  output: {
+    ...config.output,
+    path: path.resolve(__dirname, '../build'),
+    filename: '[name].js',
+    chunkFilename: 'chunks/[name].js',
+    libraryTarget: 'commonjs2',
+  },
+
+  // webpack mutates resolve object, so clone it to avoid issues
+  resolve: {
+    ...config.resolve,
+  },
+
+  module: {
+    ...config.module,
+
+    rules: overrideRules(config.module.rules, rule => {
+      // Override babel-preset-env configuration for Node.js
+      if (rule.loader === 'babel-loader') {
+        return {
+          ...rule,
+          options: {
+            ...rule.options,
+            presets: rule.options.presets.map(
+              preset =>
+                preset[0] !== 'env'
+                  ? preset
+                  : [
+                      'env',
+                      {
+                        targets: {
+                          node: pkg.engines.node.match(/(\d+\.?)+/)[0],
+                        },
+                        modules: false,
+                        useBuiltIns: false,
+                        debug: false,
+                      },
+                    ],
+            ),
+          },
+        };
+      }
+
+      // Override paths to static assets
+      if (
+        rule.loader === 'file-loader' ||
+        rule.loader === 'url-loader' ||
+        rule.loader === 'svg-url-loader'
+      ) {
+        return {
+          ...rule,
+          options: {
+            ...rule.options,
+            name: `public/assets/${rule.options.name}`,
+            publicPath: url => url.replace(/^public/, ''),
+          },
+        };
+      }
+
+      return rule;
+    }),
+  },
+
+  externals: [
+    './assets.json',
+    nodeExternals({
+      whiteList: [reStyle, reImage],
+    }),
+  ],
+
+  plugins: [
+    // Define free variables
+    // https://webpack.js.org/plugins/define-plugin/
+    new webpack.DefinePlugin({
+      'process.env.NODE_ENV': isDebug ? '"development"' : '"production"',
+      'process.env.BROWSER': false,
+      __DEV__: isDebug,
+    }),
+
+    // Adds a banner to the top of each generated chunk
+    // https://webpack.js.org/plugins/banner-plugin/
+    new webpack.BannerPlugin({
+      banner: 'require("source-map-support").install();',
+      raw: true,
+      entryOnly: false,
+    }),
+  ],
+
+  // Do not replace node globals with polyfills
+  // https://webpack.js.org/configuration/node/
+  node: {
+    console: false,
+    global: false,
+    process: false,
+    Buffer: false,
+    __filename: false,
+    __dirname: false,
+  },
+};
+
+export default [clientConfig, serverConfig, socketConfig];

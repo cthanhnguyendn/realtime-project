@@ -7,6 +7,7 @@
  * LICENSE.txt file in the root directory of this source tree.
  */
 
+/*@global-import 'bootstrap/dist/css/bootstrap.css'*/
 @import '../variables.css';
 
 /*
@@ -204,4 +205,30 @@ textarea {
   h3 {
     page-break-after: avoid;
   }
+}
+
+.sideMenuContainer {
+  display: flex;
+}
+
+.sideMenu {
+  background: #031541;
+}
+
+.bodyContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.layoutHead{}
+
+.layoutBody{
+  flex: 1;
+  background: #fafafa;
+}
+.layoutFooter{}
+
+:global(.small-label){
+  font-size: 12px;
 }

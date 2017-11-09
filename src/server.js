@@ -12,12 +12,14 @@ import express from 'express';
 import Promise from 'bluebird';
 import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
-import expressGraphQL from 'express-graphql';
+// import expressGraphQL from 'express-graphql';
 import nodeFetch from 'node-fetch';
 import React from 'react';
 import ReactDOM from 'react-dom/server';
 import PrettyError from 'pretty-error';
 import morgan from 'morgan';
+// apollo
+import { getDataFromTree } from 'react-apollo';
 import App from './components/App';
 import Html from './components/Html';
 import { ErrorPageWithoutStyle } from './routes/error/ErrorPage';
@@ -37,7 +39,11 @@ import assets from './assets.json'; // eslint-disable-line import/no-unresolved
 import config from './config';
 import createApolloClient from './createApolloClient';
 import { setRuntimeVariable } from './actions/runtime';
-import { getDataFromTree } from 'react-apollo';
+import configGraphql from './configGraphql';
+
+global.window = {
+  innerHeight: 600,
+};
 
 const app = express();
 
@@ -74,41 +80,8 @@ if (__DEV__) {
 //
 // Register API middleware
 // -----------------------------------------------------------------------------
-app.use(
-  '/graphql',
-  expressGraphQL(req => ({
-    schema,
-    graphiql: __DEV__,
-    rootValue: { request: req },
-    pretty: __DEV__,
-    formatError: error => {
-      // req.ravenAddContext({
-      //   extra: {
-      //     source: error.source && error.source.body,
-      //     positions: error.positions,
-      //     path: error.path,
-      //   },
-      // });
-      if (error.path || error.name !== 'GraphQLError') {
-        // req.ravenAddContext({ tags: { graphql: 'exec_error' } });
-        // raven.captureException(error, req.ravenGetContext());
-        console.error(error);
-      } else {
-        // req.ravenAddContext({ tags: { graphql: 'wrong_query' } });
-        // raven.captureMessage(`GraphQLWrongQuery: ${error.message}`, req.ravenGetContext());
-        console.error(error);
-      }
-      return {
-        message: error.message,
-        code: (error.originalError && error.originalError.code) || 'UNDEFINED',
-        stack:
-          process.env.NODE_ENV === 'development'
-            ? error.stack.split('\n')
-            : null,
-      };
-    },
-  })),
-);
+
+configGraphql(app, schema);
 
 //
 // Register server-side rendering middleware
@@ -123,6 +96,10 @@ app.get('*', async (req, res, next) => {
     const apolloClient = createApolloClient({
       schema,
       rootValue: { request: req },
+      context: {
+        request: req,
+        user: req.user,
+      },
     });
     const fetch = createFetch(nodeFetch, {
       baseUrl: config.api.serverUrl,
@@ -221,6 +198,21 @@ app.use((err, req, res, next) => {
   res.send(`<!doctype html>${html}`);
 });
 
+// const ws = createServer(app);
+// new SubscriptionServer(
+//   {
+//     schema,
+//     execute,
+//     subscribe,
+//   },
+//   {
+//     path: WS_GQL_PATH,
+//     server: ws,
+//   },
+// );
+
+console.info(`subcription server is getting up`);
+
 //
 // Launch the server
 // -----------------------------------------------------------------------------
@@ -240,7 +232,8 @@ if (module.hot) {
   app.hot = module.hot;
   module.hot.accept('./router');
   module.hot.accept('./data/schema');
-  // module.hot.accept('./passport');
+  module.hot.accept('./security/securityRouter');
+  module.hot.accept('./security/passport');
 }
 
 export default app;
